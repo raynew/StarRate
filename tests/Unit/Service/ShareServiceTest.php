@@ -141,6 +141,63 @@ class ShareServiceTest extends TestCase
         $this->assertTrue($share['allow_download']);
     }
 
+    public function testCreateShareDefaultsGuestMessageNull(): void
+    {
+        $this->secureRandom->method('generate')->willReturn(self::SAMPLE_TOKEN);
+        $this->config->method('getUserValue')->willReturn('{}');
+        $this->config->method('setUserValue');
+
+        $share = $this->service->createShare(
+            self::OWNER_ID, '/Fotos', null, null, 0, ShareService::PERM_VIEW
+        );
+
+        $this->assertNull($share['guest_message']);
+    }
+
+    public function testCreateShareStoresTrimmedGuestMessage(): void
+    {
+        $this->secureRandom->method('generate')->willReturn(self::SAMPLE_TOKEN);
+        $this->config->method('getUserValue')->willReturn('{}');
+        $this->config->method('setUserValue');
+
+        $share = $this->service->createShare(
+            self::OWNER_ID, '/Fotos', null, null, 0, ShareService::PERM_VIEW,
+            null, false, false, false, false, 0, false,
+            "  Nur zur Auswahl.\r\nBitte nicht posten.  "
+        );
+
+        $this->assertSame("Nur zur Auswahl.\nBitte nicht posten.", $share['guest_message']);
+    }
+
+    public function testCreateShareTreatsBlankGuestMessageAsNull(): void
+    {
+        $this->secureRandom->method('generate')->willReturn(self::SAMPLE_TOKEN);
+        $this->config->method('getUserValue')->willReturn('{}');
+        $this->config->method('setUserValue');
+
+        $share = $this->service->createShare(
+            self::OWNER_ID, '/Fotos', null, null, 0, ShareService::PERM_VIEW,
+            null, false, false, false, false, 0, false, "   \n  "
+        );
+
+        $this->assertNull($share['guest_message']);
+    }
+
+    public function testCreateShareTruncatesLongGuestMessage(): void
+    {
+        $this->secureRandom->method('generate')->willReturn(self::SAMPLE_TOKEN);
+        $this->config->method('getUserValue')->willReturn('{}');
+        $this->config->method('setUserValue');
+
+        $share = $this->service->createShare(
+            self::OWNER_ID, '/Fotos', null, null, 0, ShareService::PERM_VIEW,
+            null, false, false, false, false, 0, false,
+            str_repeat('ä', ShareService::GUEST_MESSAGE_MAX + 50)
+        );
+
+        $this->assertSame(ShareService::GUEST_MESSAGE_MAX, mb_strlen($share['guest_message']));
+    }
+
     public function testCreateShareWithInvalidPermissionsThrows(): void
     {
         $this->secureRandom->method('generate')->willReturn(self::SAMPLE_TOKEN);
@@ -344,6 +401,56 @@ class ShareServiceTest extends TestCase
 
         $this->assertNull($saved[self::SAMPLE_TOKEN]['expires_at']);
         $this->assertNull($updated['expires_at']);
+    }
+
+    public function testUpdateShareSetsAndClearsGuestMessage(): void
+    {
+        $existing = [self::SAMPLE_TOKEN => [
+            'token' => self::SAMPLE_TOKEN, 'owner_id' => self::OWNER_ID,
+            'nc_path' => '/Fotos', 'password_hash' => null,
+            'expires_at' => null, 'min_rating' => 0,
+            'permissions' => ShareService::PERM_VIEW, 'active' => true,
+            'guest_message' => 'Alt',
+            'created_at' => time(),
+        ]];
+
+        $this->db->method('getQueryBuilder')
+            ->willReturn($this->makeGetShareQb([self::OWNER_ID => $existing]));
+
+        $saved = null;
+        $this->config->method('getUserValue')->willReturn(json_encode($existing));
+        $this->config->method('setUserValue')
+            ->willReturnCallback(function ($u, $a, $k, $v) use (&$saved) { $saved = json_decode($v, true); });
+
+        $updated = $this->service->updateShare(self::SAMPLE_TOKEN, ['guest_message' => ' Neu ']);
+        $this->assertSame('Neu', $saved[self::SAMPLE_TOKEN]['guest_message']);
+        $this->assertSame('Neu', $updated['guest_message']);
+
+        $updated = $this->service->updateShare(self::SAMPLE_TOKEN, ['guest_message' => null]);
+        $this->assertNull($saved[self::SAMPLE_TOKEN]['guest_message']);
+        $this->assertNull($updated['guest_message']);
+    }
+
+    public function testUpdateShareKeepsGuestMessageWhenKeyMissing(): void
+    {
+        $existing = [self::SAMPLE_TOKEN => [
+            'token' => self::SAMPLE_TOKEN, 'owner_id' => self::OWNER_ID,
+            'nc_path' => '/Fotos', 'password_hash' => null,
+            'expires_at' => null, 'min_rating' => 0,
+            'permissions' => ShareService::PERM_VIEW, 'active' => true,
+            'guest_message' => 'Bleibt',
+            'created_at' => time(),
+        ]];
+
+        $this->db->method('getQueryBuilder')
+            ->willReturn($this->makeGetShareQb([self::OWNER_ID => $existing]));
+
+        $this->config->method('getUserValue')->willReturn(json_encode($existing));
+        $this->config->method('setUserValue');
+
+        $updated = $this->service->updateShare(self::SAMPLE_TOKEN, ['min_rating' => 2]);
+
+        $this->assertSame('Bleibt', $updated['guest_message']);
     }
 
     public function testUpdateShareSetsExpiryFromTimestamp(): void

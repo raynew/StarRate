@@ -29,6 +29,7 @@
             <span v-if="createdShare.min_rating > 0"><strong>{{ t('starrate', 'Vorfilter:') }}</strong> ≥ {{ createdShare.min_rating }} ★<br/></span>
             <span v-if="createdShare.allow_pick"><strong>{{ t('starrate', 'Pick/Reject:') }}</strong> {{ t('starrate', 'Aktiviert') }}<br/></span>
             <span v-if="createdShare.allow_export"><strong>{{ t('starrate', 'Liste exportieren:') }}</strong> {{ t('starrate', 'Erlaubt') }}<br/></span>
+            <span v-if="createdShare.guest_message"><strong>{{ t('starrate', 'Nachricht an den Empfänger:') }}</strong> {{ t('starrate', 'Gesetzt') }}<br/></span>
             <span v-if="createdShare.has_password"><strong>{{ t('starrate', 'Passwortgeschützt') }}</strong><br/></span>
             <span v-if="createdShare.expires_at"><strong>{{ t('starrate', 'Läuft ab:') }}</strong> {{ formatDate(createdShare.expires_at) }}</span>
           </p>
@@ -73,6 +74,25 @@
               :placeholder="t('starrate', 'z.B. Anna, Model 1, Kunde Müller')"
               maxlength="60"
             />
+          </div>
+
+          <div class="sr-share-modal__field">
+            <label class="sr-share-modal__label">
+              {{ t('starrate', 'Nachricht an den Empfänger') }}
+              <span class="sr-share-modal__optional">({{ t('starrate', 'optional') }})</span>
+            </label>
+            <textarea
+              v-model="form.guestMessage"
+              class="sr-share-modal__input sr-share-modal__textarea"
+              rows="4"
+              :maxlength="GUEST_MESSAGE_MAX"
+              :placeholder="t('starrate', 'z.B. Diese Bilder sind nur zur Auswahl. Bitte nicht herunterladen oder in sozialen Medien posten.')"
+              data-testid="guest-message"
+            ></textarea>
+            <span class="sr-share-modal__hint">
+              {{ t('starrate', 'Wird beim Öffnen der Galerie angezeigt.') }}
+              {{ form.guestMessage.length }} / {{ GUEST_MESSAGE_MAX }}
+            </span>
           </div>
 
           <div class="sr-share-modal__field">
@@ -236,6 +256,9 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'created', 'updated'])
 
+// Muss mit ShareService::GUEST_MESSAGE_MAX übereinstimmen.
+const GUEST_MESSAGE_MAX = 2000
+
 const isEditMode = computed(() => !!props.editShare)
 
 const submitLabel = computed(() => {
@@ -268,6 +291,7 @@ function buildInitialForm() {
     return {
       ncPath:        e.nc_path || '/',
       guestName:     e.guest_name || '',
+      guestMessage:  e.guest_message || '',
       permissions:   e.permissions || 'rate',
       allowPick:     !!e.allow_pick,
       allowExport:   !!e.allow_export,
@@ -289,6 +313,7 @@ function buildInitialForm() {
   return {
     ncPath:        props.ncPath,
     guestName:     '',
+    guestMessage:  '',
     permissions:   'rate',
     allowPick:     false,
     allowExport:   false,
@@ -377,6 +402,15 @@ async function create() {
 
   if (form.value.guestName.trim()) {
     body.guest_name = form.value.guestName.trim()
+  }
+
+  // Gast-Nachricht: bei Anlage nur wenn gefüllt; im Edit-Mode immer senden,
+  // damit ein geleertes Feld die Nachricht entfernt (null).
+  const guestMessage = form.value.guestMessage.trim()
+  if (guestMessage) {
+    body.guest_message = guestMessage
+  } else if (isEditMode.value) {
+    body.guest_message = null
   }
 
   // Passwort-Logik:
@@ -518,6 +552,12 @@ async function create() {
 .sr-share-modal__select:focus {
   outline: none;
   border-color: #e94560;
+}
+.sr-share-modal__textarea {
+  font-family: inherit;
+  line-height: 1.4;
+  min-height: 5rem;
+  resize: vertical;
 }
 .sr-share-modal__input--readonly {
   color: #a1a1aa;

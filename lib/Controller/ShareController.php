@@ -45,7 +45,8 @@ class ShareController extends Controller
      *   "password": "geheim",          // optional
      *   "expires_at": 1735689600,      // Unix-Timestamp, optional
      *   "min_rating": 3,               // Vorfilter, optional (0 = alle)
-     *   "permissions": "rate"          // "view" | "rate", default "view"
+     *   "permissions": "rate",         // "view" | "rate", default "view"
+     *   "guest_message": "Bitte nicht in sozialen Medien posten."  // optional
      * }
      */
     #[NoAdminRequired]
@@ -76,6 +77,7 @@ class ShareController extends Controller
                 !empty($body['recursive']),
                 isset($body['depth']) ? (int) $body['depth'] : 0,
                 !empty($body['allow_download']),
+                $body['guest_message'] ?? null,
             );
             return new DataResponse(['share' => $share], Http::STATUS_CREATED);
         } catch (\InvalidArgumentException $e) {
@@ -300,6 +302,9 @@ class ShareController extends Controller
                 'images'  => $result['images'],
                 'folders' => $result['folders'],
                 'total'   => count($result['images']),
+                // Erst nach der Passwortprüfung ausgeliefert, damit die
+                // Nachricht nicht im HTML einer geschützten Galerie landet.
+                'guest_message' => $share['guest_message'] ?? null,
             ]);
         } catch (\Exception $e) {
             $this->logger->error("StarRate ShareController::guestImages – {$e->getMessage()}");
@@ -703,6 +708,14 @@ class ShareController extends Controller
             && !in_array($body['permissions'], [ShareService::PERM_VIEW, ShareService::PERM_RATE], true)
         ) {
             $errors[] = 'permissions muss "view" oder "rate" sein';
+        }
+
+        if (array_key_exists('guest_message', $body) && $body['guest_message'] !== null) {
+            if (!is_string($body['guest_message'])) {
+                $errors[] = 'guest_message muss ein String sein';
+            } elseif (mb_strlen(trim($body['guest_message'])) > ShareService::GUEST_MESSAGE_MAX) {
+                $errors[] = 'guest_message darf höchstens ' . ShareService::GUEST_MESSAGE_MAX . ' Zeichen lang sein';
+            }
         }
 
         if (isset($body['depth'])) {

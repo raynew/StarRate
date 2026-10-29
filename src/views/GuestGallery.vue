@@ -47,6 +47,34 @@
     :download-url-fn="downloadUrlFn"
     :download-zip-url-fn="downloadZipUrlFn"
   />
+
+  <!-- Nachricht des Fotografen (pro Share). Erscheint beim ersten Öffnen und
+       nach jeder Änderung der Nachricht; danach über den Info-Button. -->
+  <div
+    v-if="!passwordDlg && guestMessage && messageOpen"
+    class="sr-guest-msg__overlay"
+    data-testid="guest-message-dialog"
+    @click.self="dismissMessage"
+  >
+    <div class="sr-guest-msg__dialog" role="dialog" aria-modal="true" aria-labelledby="sr-guest-msg-title">
+      <h2 id="sr-guest-msg-title" class="sr-guest-msg__title">{{ t('starrate', 'Nachricht vom Fotografen') }}</h2>
+      <p class="sr-guest-msg__text">{{ guestMessage }}</p>
+      <div class="sr-guest-msg__actions">
+        <button class="sr-guest-pw__btn" data-testid="guest-message-ok" autofocus @click="dismissMessage">
+          {{ t('starrate', 'Verstanden') }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <button
+    v-if="!passwordDlg && guestMessage && !messageOpen"
+    class="sr-guest-msg__reopen"
+    data-testid="guest-message-reopen"
+    :title="t('starrate', 'Nachricht vom Fotografen anzeigen')"
+    :aria-label="t('starrate', 'Nachricht vom Fotografen anzeigen')"
+    @click="messageOpen = true"
+  >i</button>
 </template>
 
 <script setup>
@@ -98,12 +126,47 @@ function handle401() {
   passwordDlg.value   = true
 }
 
+// ── Nachricht vom Fotografen ──────────────────────────────────────────────────
+//
+// Kommt mit der Bildliste (also erst nach der Passwortprüfung). "Gelesen" wird
+// pro Share mit einem Hash der Nachricht gemerkt: ändert der Fotograf den Text,
+// erscheint der Dialog erneut.
+
+const guestMessage = ref('')
+const messageOpen  = ref(false)
+const MSG_KEY      = `sr_guest_msg_${props.token}`
+
+function hashMessage(text) {
+  let h = 0
+  for (let i = 0; i < text.length; i++) {
+    h = (Math.imul(31, h) + text.charCodeAt(i)) | 0
+  }
+  return String(h)
+}
+
+function readSeen() {
+  try { return localStorage.getItem(MSG_KEY) } catch { return null }
+}
+
+function applyGuestMessage(message) {
+  const text = typeof message === 'string' ? message.trim() : ''
+  if (text === guestMessage.value) return
+  guestMessage.value = text
+  messageOpen.value  = !!text && readSeen() !== hashMessage(text)
+}
+
+function dismissMessage() {
+  messageOpen.value = false
+  try { localStorage.setItem(MSG_KEY, hashMessage(guestMessage.value)) } catch { /* privater Modus */ }
+}
+
 // ── Gast-API-Callbacks ────────────────────────────────────────────────────────
 
 async function loadImagesFn(path) {
   try {
     const url = generateUrl(`/apps/starrate/api/guest/${props.token}/images`)
     const { data } = await axios.get(url, { params: { path }, headers: pwHeader(), timeout: 15000 })
+    if (data && 'guest_message' in data) applyGuestMessage(data.guest_message)
     return data
   } catch (e) {
     if (e?.response?.status === 401) handle401()
@@ -297,4 +360,62 @@ async function verifyPassword() {
   padding: 0.5rem 1.25rem;
 }
 .sr-guest-pw__btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.sr-guest-msg__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9000;
+}
+.sr-guest-msg__dialog {
+  background: #16213e;
+  border: 1px solid #2a2a3e;
+  border-left: 4px solid #e94560;
+  border-radius: 12px;
+  padding: 1.5rem 2rem;
+  width: min(480px, 90vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-sizing: border-box;
+}
+.sr-guest-msg__title {
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+}
+.sr-guest-msg__text {
+  color: #d4d4d8;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin: 0;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.sr-guest-msg__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.sr-guest-msg__reopen {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 8000;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid #3f3f5a;
+  background: #16213e;
+  color: #d4d4d8;
+  font: italic 600 1rem Georgia, serif;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+.sr-guest-msg__reopen:hover { border-color: #e94560; color: #fff; }
 </style>

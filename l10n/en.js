@@ -323,7 +323,17 @@ OC.L10N.register(
         "Änderungsdatum" : "Modification date",
         "••••••••  (leer lassen zum Beibehalten)" : "••••••••  (leave empty to keep)",
         "✓ Gespeichert" : "✓ Saved",
-        "✗ Fehler beim Speichern" : "✗ Error while saving"
+        "✗ Fehler beim Speichern" : "✗ Error while saving",
+
+        // ── Gast-Nachricht ────────────────────────────────────────────────────
+        "Nachricht an den Empfänger" : "Message to the recipient",
+        "Nachricht an den Empfänger:" : "Message to the recipient:",
+        "Gesetzt" : "Set",
+        "z.B. Diese Bilder sind nur zur Auswahl. Bitte nicht herunterladen oder in sozialen Medien posten." : "e.g. These images are for culling only. Please do not download them or post them on social media.",
+        "Wird beim Öffnen der Galerie angezeigt." : "Shown when the gallery is opened.",
+        "Nachricht vom Fotografen" : "Message from the photographer",
+        "Nachricht vom Fotografen anzeigen" : "Show message from the photographer",
+        "Verstanden" : "Got it"
     },
     "nplurals=2; plural=(n != 1);"
 );

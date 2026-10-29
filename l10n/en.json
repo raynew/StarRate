@@ -1,5 +1,10 @@
 {
   "translations": {
+    "Gesetzt" : "Set",
+    "Nachricht an den Empfänger" : "Message to the recipient",
+    "Nachricht an den Empfänger:" : "Message to the recipient:",
+    "Nachricht vom Fotografen" : "Message from the photographer",
+    "Nachricht vom Fotografen anzeigen" : "Show message from the photographer",
     "StarRate" : "StarRate",
     "Fotogalerie" : "Photo Gallery",
     "Professionelles Foto-Bewertungs- und Lightroom-Sync-Tool für Fotografen" :
@@ -8,9 +13,12 @@
     "Bewertung" : "Rating",
     "Bewertung entfernen" : "Remove rating",
     "Bewertung:" : "Rating:",
+    "Verstanden" : "Got it",
+    "Wird beim Öffnen der Galerie angezeigt." : "Shown when the gallery is opened.",
     "_%n Stern_::_%n Sterne_" : ["%n star", "%n stars"],
     "_%n Ordner_::_%n Ordner_" : ["%n folder", "%n folders"],
     "Bewertung konnte nicht gespeichert werden" : "Rating could not be saved",
+    "z.B. Diese Bilder sind nur zur Auswahl. Bitte nicht herunterladen oder in sozialen Medien posten." : "e.g. These images are for culling only. Please do not download them or post them on social media.",
     "{name}: {stars}" : "{name}: {stars}",
     "_%n Bild bewertet %s_::_%n Bilder bewertet %s_" : ["%n image rated %s", "%n images rated %s"],
     "_%n Bild wird bewertet…\nBitte warten_::_%n Bilder werden bewertet…\nBitte warten_" : ["%n image is being rated…\nPlease wait", "%n images are being rated…\nPlease wait"],

@@ -314,4 +314,67 @@ describe('GuestGallery', () => {
       expect.any(Object)
     )
   })
+
+  // ── Nachricht vom Fotografen ───────────────────────────────────────────────
+
+  describe('Gast-Nachricht', () => {
+    beforeEach(() => {
+      localStorage.clear()
+    })
+
+    async function loadWith(w, message) {
+      axios.get.mockResolvedValue({ data: { images: [], folders: [], guest_message: message } })
+      await galleryProps(w).loadImagesFn('')
+      await flushPromises()
+    }
+
+    it('zeigt keinen Dialog ohne Nachricht', async () => {
+      const w = factory()
+      await loadWith(w, null)
+      expect(w.find('[data-testid="guest-message-dialog"]').exists()).toBe(false)
+      expect(w.find('[data-testid="guest-message-reopen"]').exists()).toBe(false)
+    })
+
+    it('zeigt Dialog mit Nachricht beim ersten Laden', async () => {
+      const w = factory()
+      await loadWith(w, 'Bitte nicht in sozialen Medien posten.')
+      const dlg = w.find('[data-testid="guest-message-dialog"]')
+      expect(dlg.exists()).toBe(true)
+      expect(dlg.text()).toContain('Bitte nicht in sozialen Medien posten.')
+    })
+
+    it('rendert die Nachricht als Text, nicht als HTML', async () => {
+      const w = factory()
+      await loadWith(w, '<img src=x onerror=alert(1)>')
+      const dlg = w.find('[data-testid="guest-message-dialog"]')
+      expect(dlg.find('img').exists()).toBe(false)
+      expect(dlg.text()).toContain('<img src=x onerror=alert(1)>')
+    })
+
+    it('Verstanden schließt Dialog und zeigt Info-Button', async () => {
+      const w = factory()
+      await loadWith(w, 'Hinweis')
+      await w.find('[data-testid="guest-message-ok"]').trigger('click')
+      expect(w.find('[data-testid="guest-message-dialog"]').exists()).toBe(false)
+      expect(w.find('[data-testid="guest-message-reopen"]').exists()).toBe(true)
+
+      await w.find('[data-testid="guest-message-reopen"]').trigger('click')
+      expect(w.find('[data-testid="guest-message-dialog"]').exists()).toBe(true)
+    })
+
+    it('zeigt gelesene Nachricht nicht erneut, geänderte schon', async () => {
+      const w1 = factory()
+      await loadWith(w1, 'Version 1')
+      await w1.find('[data-testid="guest-message-ok"]').trigger('click')
+
+      const w2 = factory()
+      await loadWith(w2, 'Version 1')
+      expect(w2.find('[data-testid="guest-message-dialog"]').exists()).toBe(false)
+      expect(w2.find('[data-testid="guest-message-reopen"]').exists()).toBe(true)
+
+      const w3 = factory()
+      await loadWith(w3, 'Version 2')
+      expect(w3.find('[data-testid="guest-message-dialog"]').exists()).toBe(true)
+    })
+  })
 })

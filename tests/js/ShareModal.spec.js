@@ -510,4 +510,47 @@ describe('ShareModal', () => {
     await flushPromises()
     expect(axios.put.mock.calls[0][1].recursive).toBe(true)
   })
+
+  // ── Gast-Nachricht ────────────────────────────────────────────────────────
+
+  it('sendet guest_message getrimmt wenn ausgefüllt', async () => {
+    axios.post.mockResolvedValueOnce({ data: { share: { token: 'x' } } })
+    const w = factory()
+
+    await w.findAll('.sr-share-modal__toggle')[0].trigger('click') // view
+    await w.find('[data-testid="guest-message"]').setValue('  Bitte nicht posten.  ')
+    await w.find('.sr-share-modal__form').trigger('submit')
+    await flushPromises()
+
+    expect(axios.post.mock.calls[0][1].guest_message).toBe('Bitte nicht posten.')
+  })
+
+  it('sendet keine guest_message bei Anlage mit leerem Feld', async () => {
+    axios.post.mockResolvedValueOnce({ data: { share: { token: 'x' } } })
+    const w = factory()
+
+    await w.findAll('.sr-share-modal__toggle')[0].trigger('click') // view
+    await w.find('.sr-share-modal__form').trigger('submit')
+    await flushPromises()
+
+    expect('guest_message' in axios.post.mock.calls[0][1]).toBe(false)
+  })
+
+  it('Edit-Mode: guest_message wird vorbefüllt', () => {
+    const w = factory({ editShare: { ...sampleShare, guest_message: 'Nur zur Auswahl' } })
+    expect(w.find('[data-testid="guest-message"]').element.value).toBe('Nur zur Auswahl')
+  })
+
+  it('Edit-Mode: geleertes Feld sendet guest_message=null', async () => {
+    axios.put.mockResolvedValueOnce({ data: { share: { token: 'abc123' } } })
+    const w = factory({ editShare: { ...sampleShare, guest_message: 'Alt' } })
+
+    await w.find('[data-testid="guest-message"]').setValue('')
+    await w.find('form').trigger('submit')
+    await flushPromises()
+
+    const body = axios.put.mock.calls[0][1]
+    expect('guest_message' in body).toBe(true)
+    expect(body.guest_message).toBeNull()
+  })
 })

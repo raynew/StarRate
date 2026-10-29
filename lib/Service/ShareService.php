@@ -35,6 +35,10 @@ class ShareService
     // src/views/Gallery.vue übereinstimmen — bei Änderung beide anpassen.
     public const MAX_ZIP_FILES = 500;
 
+    // Maximale Länge der Gast-Nachricht (Begrüßung/Hinweise pro Share).
+    // MUSS mit GUEST_MESSAGE_MAX in src/components/ShareModal.vue übereinstimmen.
+    public const GUEST_MESSAGE_MAX = 2000;
+
     private const APP_ID               = 'starrate';
     private const CONFIG_SHARES        = 'starrate_shares';
     private const CONFIG_LOG           = 'starrate_guest_log';  // key: CONFIG_LOG_<token>
@@ -77,6 +81,7 @@ class ShareService
         bool    $recursive = false,
         int     $depth = 0,
         bool    $allowDownload = false,
+        ?string $guestMessage = null,
     ): array {
         $this->validatePermissions($permissions);
 
@@ -98,6 +103,7 @@ class ShareService
             'allow_export'  => $allowExport,
             'allow_comment' => $allowComment,
             'allow_download' => $allowDownload,
+            'guest_message' => $this->normalizeGuestMessage($guestMessage),
             'recursive'     => $recursive,
             'depth'         => max(0, min(4, $depth)),
             'created_at'    => time(),
@@ -206,6 +212,10 @@ class ShareService
         if (isset($data['allow_download'])) {
             $all[$token]['allow_download'] = (bool) $data['allow_download'];
         }
+        // array_key_exists: ein leerer String oder null entfernt die Nachricht.
+        if (array_key_exists('guest_message', $data)) {
+            $all[$token]['guest_message'] = $this->normalizeGuestMessage($data['guest_message']);
+        }
         if (isset($data['recursive'])) {
             $all[$token]['recursive'] = (bool) $data['recursive'];
         }
@@ -222,6 +232,23 @@ class ShareService
         $updated['has_password'] = !empty($updated['password_hash']);
         unset($updated['password_hash']);
         return $updated;
+    }
+
+    /**
+     * Gast-Nachricht normalisieren: Zeilenumbrüche vereinheitlichen, trimmen,
+     * auf GUEST_MESSAGE_MAX kürzen. Leer → null. Reiner Text, das Frontend
+     * rendert ohne HTML.
+     */
+    private function normalizeGuestMessage(mixed $message): ?string
+    {
+        if (!is_string($message)) {
+            return null;
+        }
+        $message = trim(str_replace(["\r\n", "\r"], "\n", $message));
+        if ($message === '') {
+            return null;
+        }
+        return mb_substr($message, 0, self::GUEST_MESSAGE_MAX);
     }
 
     /**
