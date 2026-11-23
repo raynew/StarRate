@@ -49,8 +49,11 @@
   width: 100%;
   /* NC-Header ist 50px (hardcoded in NC31). height:100% greift nicht weil
      #app-content keine gebundene Höhe hat (flex-basis:100vw, kein height).
-     vh statt dvh – dvh ist in älteren Chromium-Versionen nicht verfügbar. */
+     vh bleibt als Fallback für Browser ohne dvh. dvh rechnet die sichtbaren
+     Browserleisten mit ein — sonst liegt der untere Rand unter einer Leiste
+     am unteren Bildschirmrand (z. B. Brave auf Android). */
   height: calc(100vh - 50px);
+  height: calc(100dvh - 50px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -76,6 +79,8 @@ body#body-public #starrate-guest-root {
   inset: 0;
   width: 100vw;
   height: 100vh;
+  /* dvh: Footer (Sterne/Farben) nicht unter Brave's unterer Leiste */
+  height: 100dvh;
   z-index: 100;
   background: var(--sr-bg);
 }
