@@ -699,6 +699,44 @@ class RatingControllerTest extends TestCase
         $this->assertSame(5, $this->controller->get(self::FILE_ID)->getData()['rating']);
     }
 
+    public function testGetNeverErasesStarsFromLightroomSidecar(): void
+    {
+        // Lightroom-Sidecar ohne xmp:Rating/Label, aber mit xmpDM:pick (LR-Katalog
+        // kannte die Gast-Sterne nicht). Darf die 5★ + Farbe in der DB nicht löschen.
+        $this->mockFileById(self::FILE_ID, 'image/x-dcraw');
+        $this->tagService->method('getMetadata')->willReturn(['rating' => 5, 'color' => 'Yellow', 'pick' => 'none']);
+        $this->sidecarService->method('readMetadata')->willReturn(['rating' => 0, 'label' => null, 'pick' => 'pick']);
+        $this->tagService->expects($this->once())->method('setMetadata')
+            ->with((string) self::FILE_ID, ['rating' => 5, 'color' => 'Yellow', 'pick' => 'pick']);
+
+        $data = $this->controller->get(self::FILE_ID)->getData();
+        $this->assertSame(5, $data['rating']);
+        $this->assertSame('Yellow', $data['color']);
+    }
+
+    public function testGetDoesNotWriteWhenXmpOnlyLacksFields(): void
+    {
+        // Sidecar sagt nichts, was die DB nicht schon hat → kein Schreibzugriff.
+        $this->mockFileById(self::FILE_ID, 'image/x-dcraw');
+        $this->tagService->method('getMetadata')->willReturn(['rating' => 5, 'color' => 'Blue', 'pick' => 'pick']);
+        $this->sidecarService->method('readMetadata')->willReturn(['rating' => 0, 'label' => 'Blue', 'pick' => 'pick']);
+        $this->tagService->expects($this->never())->method('setMetadata');
+
+        $this->assertSame(5, $this->controller->get(self::FILE_ID)->getData()['rating']);
+    }
+
+    public function testGetStillAdoptsChangedRatingFromXmp(): void
+    {
+        // Ein im XMP gesetzter, anderer Stern-Wert wird weiterhin übernommen.
+        $this->mockFileById(self::FILE_ID, 'image/x-dcraw');
+        $this->tagService->method('getMetadata')->willReturn(['rating' => 5, 'color' => null, 'pick' => 'none']);
+        $this->sidecarService->method('readMetadata')->willReturn(['rating' => 3, 'label' => null, 'pick' => 'none']);
+        $this->tagService->expects($this->once())->method('setMetadata')
+            ->with((string) self::FILE_ID, ['rating' => 3, 'color' => null, 'pick' => 'none']);
+
+        $this->controller->get(self::FILE_ID);
+    }
+
     public function testDeleteSurvivesSidecarWriteFailure(): void
     {
         // Tags sind schon zurückgesetzt — ein gesperrtes Sidecar darf kein 500 auslösen
