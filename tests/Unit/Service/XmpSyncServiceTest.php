@@ -6,6 +6,7 @@ namespace OCA\StarRate\Tests\Unit\Service;
 
 use OCA\StarRate\Service\ExifService;
 use OCA\StarRate\Service\SidecarService;
+use OCA\StarRate\Service\XmpService;
 use OCA\StarRate\Service\XmpStoreResolver;
 use OCA\StarRate\Service\XmpSyncService;
 use OCP\Files\File;
@@ -31,6 +32,7 @@ class XmpSyncServiceTest extends TestCase
         $this->exif    = $this->createMock(ExifService::class);
         $this->sync    = new XmpSyncService(
             new XmpStoreResolver($this->exif, $this->sidecar),
+            new XmpService(),
             $this->createMock(LoggerInterface::class),
         );
     }
@@ -88,7 +90,7 @@ class XmpSyncServiceTest extends TestCase
         // DSC_2195: StarRate Blue, Lightroom-Sidecar ohne Farbe, mit Pick
         $this->sidecar->method('readMetadata')->willReturn(self::xmp(0, null, 'pick'));
         $this->sidecar->expects($this->once())->method('writeMetadata')
-            ->with($this->anything(), null, 'Blue', null, 'en');
+            ->with($this->anything(), 0, 'Blue', 'pick', 'en');
 
         $r = $this->sync->apply($this->raw(), self::db(0, 'Blue', 'none'), self::SETTINGS, ['rating', 'color'], false);
         $this->assertSame('written', $r);
@@ -108,7 +110,7 @@ class XmpSyncServiceTest extends TestCase
     {
         $this->sidecar->method('readMetadata')->willReturn(self::xmp(5, 'Green', 'pick'));
         $this->sidecar->expects($this->once())->method('writeMetadata')
-            ->with($this->anything(), null, 'Yellow', null, 'en');
+            ->with($this->anything(), 5, 'Yellow', 'pick', 'en');
 
         $this->sync->apply($this->raw(), self::db(5, 'Yellow', 'pick'), self::SETTINGS, ['rating', 'color'], true);
     }

@@ -72,7 +72,7 @@ class XmpSyncController extends Controller
             XmpSyncService::KIND_DIFFERENT => ['rating' => 0, 'color' => 0, 'pick' => 0],
             XmpSyncService::KIND_EXTRA     => ['rating' => 0, 'color' => 0, 'pick' => 0],
         ];
-        $checked = $noStore = $unreadable = $notFound = 0;
+        $checked = $noStore = $unreadable = $notFound = $skipped = 0;
 
         foreach ($ids as $id) {
             $file = $this->getFileById($userId, $id);
@@ -84,6 +84,7 @@ class XmpSyncController extends Controller
             $cmp = $this->sync->compare($file, $db, $settings);
 
             if ($cmp['status'] === XmpSyncService::RESULT_NO_STORE) { $noStore++; continue; }
+            if ($cmp['status'] === XmpSyncService::RESULT_SKIPPED)  { $skipped++; continue; }
             if ($cmp['status'] !== 'ok')                            { $unreadable++; continue; }
             $checked++;
 
@@ -104,6 +105,7 @@ class XmpSyncController extends Controller
             'noStore'    => $noStore,
             'unreadable' => $unreadable,
             'notFound'   => $notFound,
+            'skipped'    => $skipped,
         ]);
     }
 
@@ -143,6 +145,7 @@ class XmpSyncController extends Controller
             XmpSyncService::RESULT_UNCHANGED => 0,
             XmpSyncService::RESULT_NO_STORE  => 0,
             XmpSyncService::RESULT_FAILED    => 0,
+            XmpSyncService::RESULT_SKIPPED   => 0,
         ];
         $failed = [];
 

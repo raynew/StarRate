@@ -78,4 +78,23 @@ describe('WriteToFilesModal', () => {
     expect(document.body.textContent).toContain('ausgeschaltet')
     w.unmount()
   })
+
+  it('Escape schließt den Dialog auch hinter Gallerys Capture-Handler', async () => {
+    const blocker = (e) => { if (e.key === 'Escape') e.stopPropagation() }
+    document.addEventListener('keydown', blocker, true)
+    const w = factory()
+    await flushPromises()
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(w.emitted('close')).toBeTruthy()
+    document.removeEventListener('keydown', blocker, true)
+    w.unmount()
+  })
+
+  it('zeigt übersprungene Dateien mit unbekannten Werten an', async () => {
+    axios.post.mockResolvedValueOnce({ data: { ...previewData, skipped: 2 } })
+    const w = factory()
+    await flushPromises()
+    expect(document.body.textContent).toContain('2 Dateien mit Werten, die StarRate nicht kennt')
+    w.unmount()
+  })
 })

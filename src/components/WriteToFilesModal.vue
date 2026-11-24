@@ -137,9 +137,10 @@ const phase    = ref('loading')   // loading | ready | writing | done | error
 const progress = ref({ done: 0, total: 0 })
 const items    = ref([])
 const counts   = ref({ missing: {}, different: {} })
-const skipped  = ref({ noStore: 0, unreadable: 0 })
+const skipped  = ref({ noStore: 0, unreadable: 0, unsupported: 0 })
 const result   = ref({ written: 0, failed: 0 })
 const errorText = ref('')
+let alive = true   // nach dem Schließen keine weiteren Häppchen senden
 
 // Pick standardmäßig aus: Lightroom und StarRate setzen Flags oft unabhängig
 const fields    = ref({ rating: true, color: true, pick: false })
@@ -191,6 +192,7 @@ const skippedText = computed(() => {
   const parts = []
   if (skipped.value.noStore)    parts.push(n('starrate', '%n Bild ohne XMP-Ziel übersprungen', '%n Bilder ohne XMP-Ziel übersprungen', skipped.value.noStore))
   if (skipped.value.unreadable) parts.push(n('starrate', '%n Datei nicht lesbar', '%n Dateien nicht lesbar', skipped.value.unreadable))
+  if (skipped.value.unsupported) parts.push(n('starrate', '%n Datei mit Werten, die StarRate nicht kennt, bleibt unangetastet', '%n Dateien mit Werten, die StarRate nicht kennt, bleiben unangetastet', skipped.value.unsupported))
   return parts.join(' · ')
 })
 
@@ -213,6 +215,7 @@ async function loadPreview() {
   const merged = { missing: {}, different: {} }
   try {
     for (const part of chunks(ids, PREVIEW_CHUNK)) {
+      if (!alive) return
       const { data } = await axios.post(generateUrl('/apps/starrate/api/xmp-sync/preview'), { fileIds: part }, { timeout: 120000 })
       items.value.push(...data.items)
       for (const kind of ['missing', 'different']) {
@@ -220,6 +223,7 @@ async function loadPreview() {
       }
       skipped.value.noStore    += data.noStore
       skipped.value.unreadable += data.unreadable
+      skipped.value.unsupported += data.skipped || 0
       progress.value.done += part.length
     }
     counts.value = merged
@@ -237,6 +241,7 @@ async function apply() {
   result.value = { written: 0, failed: 0 }
   phase.value = 'writing'
   for (const part of chunks(ids, APPLY_CHUNK)) {
+    if (!alive) return
     try {
       const { data } = await axios.post(
         generateUrl('/apps/starrate/api/xmp-sync/apply'),
@@ -259,10 +264,15 @@ function close() {
 function onKeydown(e) { if (e.key === 'Escape') close() }
 
 onMounted(() => {
-  document.addEventListener('keydown', onKeydown)
+  // Capture-Phase: Gallerys Escape-Handler (ebenfalls Capture auf document)
+  // stoppt die Propagation, ein Bubble-Listener käme nie an.
+  document.addEventListener('keydown', onKeydown, true)
   loadPreview()
 })
-onUnmounted(() => document.removeEventListener('keydown', onKeydown))
+onUnmounted(() => {
+  alive = false
+  document.removeEventListener('keydown', onKeydown, true)
+})
 
 defineExpose({ rows, phase })
 </script>

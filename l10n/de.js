@@ -293,7 +293,8 @@ OC.L10N.register(
         "_%n fehlgeschlagen_::_%n fehlgeschlagen_" : ["%n fehlgeschlagen", "%n fehlgeschlagen"],
         "_In %n Datei schreiben_::_In %n Dateien schreiben_" : ["In %n Datei schreiben", "In %n Dateien schreiben"],
         "_%n Bild ohne XMP-Ziel übersprungen_::_%n Bilder ohne XMP-Ziel übersprungen_" : ["%n Bild ohne XMP-Ziel übersprungen", "%n Bilder ohne XMP-Ziel übersprungen"],
-        "_%n Datei nicht lesbar_::_%n Dateien nicht lesbar_" : ["%n Datei nicht lesbar", "%n Dateien nicht lesbar"]
+        "_%n Datei nicht lesbar_::_%n Dateien nicht lesbar_" : ["%n Datei nicht lesbar", "%n Dateien nicht lesbar"],
+        "_%n Datei mit Werten, die StarRate nicht kennt, bleibt unangetastet_::_%n Dateien mit Werten, die StarRate nicht kennt, bleiben unangetastet_" : ["%n Datei mit Werten, die StarRate nicht kennt, bleibt unangetastet", "%n Dateien mit Werten, die StarRate nicht kennt, bleiben unangetastet"]
     },
     "nplurals=2; plural=(n != 1);"
 );

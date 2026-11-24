@@ -21,6 +21,10 @@ use Psr\Log\LoggerInterface;
  * - missing:   StarRate hat einen Wert, die Datei keinen   → wird ergänzt
  * - different: beide haben einen Wert, er weicht ab        → nur mit $overwrite
  * - extra:     nur die Datei hat einen Wert               → bleibt immer stehen
+ *
+ * Dateien mit Werten, die StarRate nicht versteht (xmp:Rating="-1", eigenes
+ * Label-Set, …), werden komplett ausgelassen: der XMP-Patch schreibt immer alle
+ * drei Felder neu und würde solche Werte sonst löschen.
  */
 class XmpSyncService
 {
@@ -34,9 +38,12 @@ class XmpSyncService
     public const RESULT_UNCHANGED = 'unchanged';
     public const RESULT_NO_STORE  = 'no_store';
     public const RESULT_FAILED    = 'failed';
+    /** Datei enthält Werte, die StarRate nicht lesen kann → nie anfassen */
+    public const RESULT_SKIPPED   = 'skipped';
 
     public function __construct(
         private readonly XmpStoreResolver $xmpStores,
+        private readonly XmpService $xmpService,
         private readonly LoggerInterface $logger,
     ) {}
 
@@ -95,8 +102,9 @@ class XmpSyncService
      * Liest das XMP der Datei und vergleicht es mit $db.
      *
      * @param array{rating: int, color: string|null, pick: string} $db
-     * @return array{status: string, diffs: array<string, array{db: mixed, file: mixed, kind: string}>}
-     *         status: ok | no_store (kein XMP-Ziel, z.B. PNG/DNG oder Einstellung aus) | unreadable
+     * @return array{status: string, diffs: array<string, array{db: mixed, file: mixed, kind: string}>, unreadable?: list<string>}
+     *         status: ok | no_store (kein XMP-Ziel, z.B. PNG/DNG oder Einstellung aus)
+     *                 | skipped (Datei enthält unlesbare Werte) | unreadable (Lesefehler)
      */
     public function compare(File $file, array $db, array $settings): array
     {
@@ -105,10 +113,13 @@ class XmpSyncService
             return ['status' => self::RESULT_NO_STORE, 'diffs' => []];
         }
         try {
-            $xmp = $store->readMetadata($file);
+            [$xmp, $unknown] = $this->inspect($store, $file);
         } catch (\Exception $e) {
             $this->logger->info("StarRate xmp-sync: cannot read XMP of {$file->getId()}: " . $e->getMessage());
             return ['status' => 'unreadable', 'diffs' => []];
+        }
+        if ($unknown !== []) {
+            return ['status' => self::RESULT_SKIPPED, 'diffs' => [], 'unreadable' => $unknown];
         }
         return ['status' => 'ok', 'diffs' => self::diff($db, $xmp)];
     }
@@ -117,6 +128,11 @@ class XmpSyncService
      * Schreibt die StarRate-Werte der gewählten Felder in die Datei — nur fehlende,
      * mit $overwrite auch abweichende. Der Vergleich wird hier neu gemacht (nicht
      * dem Client geglaubt), damit nie mehr geschrieben wird als die Vorschau zeigt.
+     *
+     * Alle drei Felder werden explizit übergeben (nicht gewählte mit dem aktuellen
+     * Datei-Wert), sonst füllt SidecarService::writeMetadata fehlende Felder aus der
+     * DB auf — z.B. einen Pick, obwohl Markierungen abgewählt waren. Beim JPEG trägt
+     * das auch ein reines EXIF-Rating ins XMP, statt es mit xmp:Rating="0" zu verdecken.
      *
      * @param array{rating: int, color: string|null, pick: string} $db
      * @param list<string> $fields
@@ -128,16 +144,23 @@ class XmpSyncService
             return self::RESULT_NO_STORE;
         }
         try {
-            $diffs   = self::diff($db, $store->readMetadata($file));
-            $toWrite = self::fieldsToWrite($diffs, $fields, $overwrite);
+            [$xmp, $unknown] = $this->inspect($store, $file);
+            if ($unknown !== []) {
+                return self::RESULT_SKIPPED;
+            }
+            $toWrite = self::fieldsToWrite(self::diff($db, $xmp), $fields, $overwrite);
             if ($toWrite === []) {
                 return self::RESULT_UNCHANGED;
             }
+            $rating = in_array('rating', $toWrite, true) ? $db['rating'] : $xmp['rating'];
+            $color  = in_array('color', $toWrite, true)  ? $db['color']  : $xmp['label'];
+            $pick   = in_array('pick', $toWrite, true)   ? $db['pick']   : $xmp['pick'];
+
             $store->writeMetadata(
                 $file,
-                in_array('rating', $toWrite, true) ? $db['rating'] : null,
-                in_array('color', $toWrite, true)  ? ($db['color'] ?? '') : null,
-                in_array('pick', $toWrite, true)   ? $db['pick'] : null,
+                $rating,
+                $color ?? '',
+                $pick,
                 $settings['xmp_label_language'] ?? XmpService::LABEL_LANG_EN,
             );
             return self::RESULT_WRITTEN;
@@ -145,5 +168,15 @@ class XmpSyncService
             $this->logger->warning("StarRate xmp-sync: write failed for {$file->getId()}: " . $e->getMessage());
             return self::RESULT_FAILED;
         }
+    }
+
+    /**
+     * @return array{0: array{rating: int, label: string|null, pick: string}, 1: list<string>}
+     */
+    private function inspect(XmpStore $store, File $file): array
+    {
+        $xmp     = $store->readMetadata($file);
+        $unknown = $this->xmpService->unreadableFields($store->readXmpPacket($file));
+        return [$xmp, $unknown];
     }
 }
