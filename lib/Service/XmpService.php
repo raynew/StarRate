@@ -134,6 +134,54 @@ XMP;
     }
 
     /**
+     * Felder, die im XMP stehen, aber von parseXmpContent() nicht verstanden werden —
+     * z.B. xmp:Rating="-1" (alter Lightroom-Reject), ein eigenes Label-Set
+     * („To Print“) oder ein unbekannter xmpDM:pick-Wert. parseXmpContent() liefert
+     * dafür „leer“; beim Patchen würden sie gelöscht. Wer nicht löschen darf
+     * (z.B. „In Dateien schreiben“), muss solche Dateien auslassen.
+     *
+     * @return list<'rating'|'color'|'pick'>
+     */
+    public function unreadableFields(string $xmp): array
+    {
+        if (trim($xmp) === '') {
+            return [];
+        }
+        $parsed = $this->parseXmpContent($xmp);
+        $out    = [];
+
+        foreach (['/(?:xmp|xap):Rating\s*=\s*[\'"]([^\'"]*)[\'"]/', '/<(?:xmp|xap):Rating>([^<]*)<\//'] as $re) {
+            if (preg_match_all($re, $xmp, $m)) {
+                foreach ($m[1] as $v) {
+                    if (!preg_match('/^\s*[0-5]\s*$/', $v)) { $out[] = 'rating'; break 2; }
+                }
+            }
+        }
+
+        if ($parsed['label'] === null) {
+            $labelRes = [
+                '/(?:xmp|xap):Label\s*=\s*[\'"]([^\'"]*)[\'"]/', '/<(?:xmp|xap):Label>([^<]*)<\//',
+                '/photoshop:LabelColor\s*=\s*[\'"]([^\'"]*)[\'"]/', '/<photoshop:LabelColor>([^<]*)<\//',
+                '/digiKam:ColorLabel\s*=\s*[\'"]([^\'"]*)[\'"]/', '/<digiKam:ColorLabel>([^<]*)<\//',
+            ];
+            foreach ($labelRes as $re) {
+                if (preg_match($re, $xmp, $m) && trim($m[1]) !== '' && trim($m[1]) !== '0') {
+                    $out[] = 'color';
+                    break;
+                }
+            }
+        }
+
+        foreach (['/xmpDM:pick\s*=\s*[\'"]([^\'"]*)[\'"]/', '/<xmpDM:pick>([^<]*)<\//'] as $re) {
+            if (preg_match($re, $xmp, $m) && !preg_match('/^\s*(-1|0|1)\s*$/', $m[1])) {
+                $out[] = 'pick';
+                break;
+            }
+        }
+        return $out;
+    }
+
+    /**
      * Parst einen XMP-String und gibt Rating + Label + Pick zurück.
      *
      * Rating-Auflösung:
