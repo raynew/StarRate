@@ -75,10 +75,16 @@ class RatingController extends Controller
                     $xmp    = $store->readMetadata($file);
                     $synced = self::mergeSelfHeal($db, $xmp);
 
-                    if ($synced['rating'] !== $db['rating']
-                        || $synced['color'] !== $db['color']
-                        || $synced['pick'] !== $db['pick']) {
-                        $this->tagService->setMetadata($fileIdStr, $synced);
+                    // Nur geänderte Felder schreiben: setMetadata löscht pro übergebenem
+                    // Feld erst alle Tags und legt dann neu an — unveränderte Felder
+                    // (z.B. Gast-Sterne) bleiben so außerhalb dieses Fensters.
+                    $changed = [];
+                    if ($synced['rating'] !== $db['rating']) $changed['rating'] = $synced['rating'];
+                    if ($synced['color']  !== $db['color'])  $changed['color']  = $synced['color'];
+                    if ($synced['pick']   !== $db['pick'])   $changed['pick']   = $synced['pick'];
+
+                    if ($changed !== []) {
+                        $this->tagService->setMetadata($fileIdStr, $changed);
                         return new DataResponse($synced);
                     }
                 } catch (\Exception $e) {
